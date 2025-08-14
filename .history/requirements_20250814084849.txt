@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+torch
+torchvision
+Pillow
+mlflow
+scikit-learn
+numpy
+opencv-python-headless
