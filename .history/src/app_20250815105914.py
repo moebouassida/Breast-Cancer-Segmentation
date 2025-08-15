@@ -111,7 +111,7 @@ async def predict(file: UploadFile = File(...), return_images: bool = True):
         result["overlay_png_b64"] = overlay_to_b64(gray01, mask)
     return result
 
-# --------- Gradio UI  ---------
+# --------- Gradio UI (mounted at /gradio) ---------
 @torch.no_grad()
 def gradio_predict(image: Image.Image):
     image = image.convert("L")

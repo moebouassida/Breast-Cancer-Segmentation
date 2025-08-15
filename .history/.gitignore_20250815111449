@@ -1,0 +1,32 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# Virtual environments
+venv/
+.env/
+
+# MLflow local tracking data (optional if you don't want it in repo)
+Experiments/mlruns/
+
+# Temporary files and outputs
+temp_vis/
+figures/
+metrics/
+summary.json
+
+# Model checkpoints
+*.pt
+checkpoints/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Docker build artifacts
+*.log
