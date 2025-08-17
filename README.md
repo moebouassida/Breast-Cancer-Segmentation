@@ -10,7 +10,7 @@ Semantic segmentation of breast ultrasound images — trained with PyTorch and d
 ---
 
 ## 📖 Project Story
-This project started as a simple experiment in a Jupyter notebook.  
+This project started as a simple experiment in a Jupyter notebook. (Old notebook can be found under Notebooks/
 At the time there was:
 - no API  
 - no deployment  
