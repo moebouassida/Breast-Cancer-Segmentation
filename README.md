@@ -5,7 +5,7 @@ Semantic segmentation of breast ultrasound images — trained with PyTorch and d
 ---
 
 ## 📸 Demo Screenshot
-![Gradio Demo](assets/demo.png)
+![Gradio Demo](Assets/demo.png)
 
 ---
 
