@@ -44,7 +44,7 @@ if (BASE_DIR / "frontend").is_dir():
 
 # --------- Model Wrapper ---------
 # Use relative import since we're running as package "src.app"
-from model import UNet  # ensure src/model.py defines UNet
+from .model import UNet  # ensure src/model.py defines UNet
 
 class ModelWrapper:
     def __init__(self, checkpoint_path: Path, device: str = "cpu"):

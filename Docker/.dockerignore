@@ -1,0 +1,13 @@
+.git
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv
+Assets/
+Data/
+temp_vis/
+figures/
+metrics/
+Notebook/
