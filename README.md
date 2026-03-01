@@ -3,7 +3,7 @@
 > Semantic segmentation of breast ultrasound images using a custom U-Net architecture.  
 > Trained on the BUSI dataset · Served via FastAPI · Deployed with Docker · CI/CD with GitHub Actions.
 
-![CI Pipeline](https://github.com/moebouassida/Breast-Cancer-Segmentation/actions/workflows/ci.yml/badge.svg)
+![CI Pipeline](https://github.com/moebouassida/Breast-Cancer-Segmentation/actions/workflows/ci_cd.yml/badge.svg)
 [![HuggingFace](https://img.shields.io/badge/🤗%20Demo-HuggingFace%20Spaces-yellow)](https://huggingface.co/spaces/moebouassida/breast-ultrasound-segmentation)
 ![Python](https://img.shields.io/badge/python-3.10-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.0-orange)
@@ -285,3 +285,4 @@ MIT License — free to use and modify.
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-blue)](https://www.linkedin.com/in/moezbouassida/)
 
 [![GitHub](https://img.shields.io/badge/GitHub-Follow-black)](https://github.com/moebouassida)
+
