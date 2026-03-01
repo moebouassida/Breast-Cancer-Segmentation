@@ -1,13 +1,51 @@
+# Git
 .git
+.gitignore
+.github/
+
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.egg-info/
+.eggs/
+
+# Environments
 .env
 .venv
-Assets/
+venv/
+env/
+
+# Data (mounted at runtime or not needed in container)
 Data/
+*.csv
+*.parquet
+
+# Large files not needed in container
+Assets/
+Notebook/
+.history/
+
+# Training artifacts (not needed for serving)
 temp_vis/
 figures/
 metrics/
-Notebook/
+Experiments/
+mlruns/
+wandb/
+
+# DVC
+.dvc/
+
+# Tests (not needed in production image)
+tests/
+
+# Dev tools
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+
+# OS
+.DS_Store
+Thumbs.db

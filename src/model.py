@@ -1,78 +1,82 @@
 import torch
 import torch.nn as nn
 
-def conv_block(in_channels, out_channels):
+
+def conv_block(in_ch: int, out_ch: int) -> nn.Sequential:
     return nn.Sequential(
-        nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
-        nn.BatchNorm2d(out_channels),
+        nn.Conv2d(in_ch, out_ch, kernel_size=3, padding=1, bias=False),
+        nn.BatchNorm2d(out_ch),
         nn.ReLU(inplace=True),
-        nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
-        nn.BatchNorm2d(out_channels),
+        nn.Conv2d(out_ch, out_ch, kernel_size=3, padding=1, bias=False),
+        nn.BatchNorm2d(out_ch),
         nn.ReLU(inplace=True),
     )
 
-def encoder_block(in_channels, out_channels):
-    return nn.Sequential(
-        conv_block(in_channels, out_channels),
-        nn.MaxPool2d(kernel_size=2, stride=2)
-    )
-
-def decoder_block(in_channels, out_channels):
-    return nn.Sequential(
-        nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2),
-        conv_block(out_channels*2, out_channels)
-    )
 
 class UNet(nn.Module):
-    def __init__(self, in_channels=1, out_channels=1):
-        super(UNet, self).__init__()
-        self.enc1 = conv_block(in_channels, 64)
-        self.pool1 = nn.MaxPool2d(2)
-        self.enc2 = conv_block(64, 128)
-        self.pool2 = nn.MaxPool2d(2)
-        self.enc3 = conv_block(128, 256)
-        self.pool3 = nn.MaxPool2d(2)
-        self.enc4 = conv_block(256, 512)
-        self.pool4 = nn.MaxPool2d(2)
+    """
+    U-Net for binary breast ultrasound segmentation.
 
-        self.bottleneck = conv_block(512, 1024)
+    Args:
+        in_channels:  number of input channels (1 for grayscale ultrasound)
+        out_channels: number of output channels (1 for binary mask)
+        features:     channel sizes at each encoder level
+    """
 
-        self.upconv4 = nn.ConvTranspose2d(1024, 512, 2, 2)
-        self.dec4 = conv_block(1024, 512)
-        self.upconv3 = nn.ConvTranspose2d(512, 256, 2, 2)
-        self.dec3 = conv_block(512, 256)
-        self.upconv2 = nn.ConvTranspose2d(256, 128, 2, 2)
-        self.dec2 = conv_block(256, 128)
-        self.upconv1 = nn.ConvTranspose2d(128, 64, 2, 2)
-        self.dec1 = conv_block(128, 64)
+    def __init__(
+        self,
+        in_channels: int = 1,
+        out_channels: int = 1,
+        features: list = [64, 128, 256, 512],
+    ):
+        super().__init__()
+        self.encoders = nn.ModuleList()
+        self.pools = nn.ModuleList()
+        self.decoders = nn.ModuleList()
+        self.upconvs = nn.ModuleList()
 
-        self.conv_last = nn.Conv2d(64, out_channels, kernel_size=1)
-
-    def forward(self, x):
         # Encoder
-        e1 = self.enc1(x)
-        e2 = self.enc2(self.pool1(e1))
-        e3 = self.enc3(self.pool2(e2))
-        e4 = self.enc4(self.pool3(e3))
+        ch = in_channels
+        for f in features:
+            self.encoders.append(conv_block(ch, f))
+            self.pools.append(nn.MaxPool2d(2))
+            ch = f
 
-        b = self.bottleneck(self.pool4(e4))
+        # Bottleneck
+        self.bottleneck = conv_block(features[-1], features[-1] * 2)
 
         # Decoder
-        d4 = self.upconv4(b)
-        d4 = torch.cat((d4, e4), dim=1)
-        d4 = self.dec4(d4)
+        for f in reversed(features):
+            self.upconvs.append(nn.ConvTranspose2d(f * 2, f, kernel_size=2, stride=2))
+            self.decoders.append(conv_block(f * 2, f))
 
-        d3 = self.upconv3(d4)
-        d3 = torch.cat((d3, e3), dim=1)
-        d3 = self.dec3(d3)
+        self.final_conv = nn.Conv2d(features[0], out_channels, kernel_size=1)
 
-        d2 = self.upconv2(d3)
-        d2 = torch.cat((d2, e2), dim=1)
-        d2 = self.dec2(d2)
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        skip_connections = []
 
-        d1 = self.upconv1(d2)
-        d1 = torch.cat((d1, e1), dim=1)
-        d1 = self.dec1(d1)
+        # Encode
+        for enc, pool in zip(self.encoders, self.pools):
+            x = enc(x)
+            skip_connections.append(x)
+            x = pool(x)
 
-        out = self.conv_last(d1)
-        return out
+        x = self.bottleneck(x)
+        skip_connections = skip_connections[::-1]
+
+        # Decode
+        for upconv, dec, skip in zip(self.upconvs, self.decoders, skip_connections):
+            x = upconv(x)
+            # Handle odd spatial dimensions
+            if x.shape != skip.shape:
+                x = torch.nn.functional.interpolate(
+                    x, size=skip.shape[2:], mode="bilinear", align_corners=False
+                )
+            x = torch.cat([skip, x], dim=1)
+            x = dec(x)
+
+        return self.final_conv(x)
+
+
+def count_parameters(model: nn.Module) -> int:
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)

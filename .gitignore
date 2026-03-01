@@ -1,32 +1,51 @@
-# Python cache
+# Python
 __pycache__/
 *.pyc
 *.pyo
-*.pyd
-
-# Jupyter notebook checkpoints
-.ipynb_checkpoints/
-
-# Virtual environments
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
 venv/
-.env/
+.venv/
+env/
 
-# MLflow local tracking data (optional if you don't want it in repo)
-Experiments/mlruns/
+# Data — tracked by DVC instead
+Data/Dataset_BUSI_with_GT/
+*.csv
+*.parquet
+*.h5
 
-# Temporary files and outputs
+# Model weights — stored locally, not in Git
+checkpoints/*.pt
+checkpoints/*.pth
+!checkpoints/.gitkeep
+
+# MLflow
+Experiments/
+mlruns/
+
+# W&B
+wandb/
+
+# Training artifacts
 temp_vis/
 figures/
 metrics/
-summary.json
 
-# Model checkpoints
-*.pt
-checkpoints/
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
 
-# OS-specific files
+# Secrets
+.env
+*.env
+config/secrets.yaml
+
+# OS
 .DS_Store
 Thumbs.db
 
-# Docker build artifacts
-*.log
+# Docker
+.dockerignore

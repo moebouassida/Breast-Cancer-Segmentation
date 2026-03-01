@@ -1,20 +1,21 @@
 import torch
 import mlflow
-from src.metrics import dice_score, iou_score, pixel_accuracy, precision_score, recall_score
-from src.utils import log_prediction_visual, log_sample_grid
+import wandb
+import numpy as np
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import os
+
+from src.metrics import compute_all_metrics, dice_score, iou_score
 
 
-def _threshold_sweep_for_batch(logits, masks, device, thresholds=None):
-    """
-    Do a simple threshold sweep on the first batch to visualize
-    how dice/iou vary with threshold.
-    """
-    if thresholds is None:
-        thresholds = [i / 20 for i in range(1, 20)]  # 0.05..0.95
-
+def _threshold_sweep(logits: torch.Tensor, masks: torch.Tensor, device: str):
+    thresholds = [i / 20 for i in range(1, 20)]
+    probs = torch.sigmoid(logits.to(device))
+    masks = masks.to(device)
+    dice_vals, iou_vals = [], []
     with torch.no_grad():
-        probs = torch.sigmoid(logits)
-        dice_vals, iou_vals = [], []
         for t in thresholds:
             preds = (probs > t).float()
             dice_vals.append(dice_score(preds, masks).item())
@@ -22,69 +23,116 @@ def _threshold_sweep_for_batch(logits, masks, device, thresholds=None):
     return thresholds, dice_vals, iou_vals
 
 
-def validate(model, val_loader, device, log_images=False, epoch=None, do_threshold_sweep=True):
-    model = model.to(device)
-    model.eval()
+def _make_overlay(img_np: np.ndarray, mask_np: np.ndarray, color="red") -> np.ndarray:
+    """Overlay a binary mask on a grayscale image."""
+    rgb = np.stack([img_np, img_np, img_np], axis=-1)
+    overlay = rgb.copy()
+    ch = {"red": 0, "green": 1, "blue": 2}.get(color, 0)
+    overlay[..., ch] = np.maximum(overlay[..., ch], mask_np * 0.6)
+    return np.clip(overlay, 0, 1)
 
-    dices, val_iou, val_pixel_acc, val_precision, val_recall = [], [], [], [], []
-    first_batch_cache = None
+
+def validate(
+    model: torch.nn.Module,
+    val_loader,
+    device: str,
+    epoch: int = 0,
+    log_images: bool = True,
+    use_wandb: bool = True,
+) -> dict:
+    """
+    Run validation loop, compute all metrics, log to MLflow + W&B.
+    Returns dict of averaged metrics.
+    """
+    model.eval()
+    accumulated = {k: [] for k in ["dice", "iou", "pixel_accuracy", "precision", "recall", "f1"]}
+    first_batch = None
 
     with torch.no_grad():
         for batch_idx, (images, masks) in enumerate(val_loader):
             images, masks = images.to(device), masks.to(device)
             logits = model(images)
-            outputs = torch.sigmoid(logits)
-            preds = (outputs > 0.5).float()
+            preds = (torch.sigmoid(logits) > 0.5).float()
 
-            dices.append(dice_score(preds, masks).item())
-            val_iou.append(iou_score(preds, masks).item())
-            val_pixel_acc.append(pixel_accuracy(preds, masks).item())
-            val_precision.append(precision_score(preds, masks).item())
-            val_recall.append(recall_score(preds, masks).item())
+            batch_metrics = compute_all_metrics(preds, masks)
+            for k, v in batch_metrics.items():
+                accumulated[k].append(v)
 
-            # Cache first batch for visuals and threshold sweep
-            if first_batch_cache is None:
-                first_batch_cache = (images.detach().cpu(), masks.detach().cpu(), preds.detach().cpu(), logits.detach().cpu())
-
-            # Log only first sample overlay for quick glance
-            if log_images and batch_idx == 0:
-                log_prediction_visual(
-                    image=images[0].detach().cpu().numpy(),
-                    mask_true=masks[0].detach().cpu().numpy(),
-                    mask_pred=preds[0].detach().cpu().numpy(),
-                    step=epoch
+            if first_batch is None:
+                first_batch = (
+                    images.detach().cpu(),
+                    masks.detach().cpu(),
+                    preds.detach().cpu(),
+                    logits.detach().cpu(),
                 )
 
-        # Averages
-        avg_dice = sum(dices) / len(dices)
-        avg_iou = sum(val_iou) / len(val_iou)
-        avg_pixel_acc = sum(val_pixel_acc) / len(val_pixel_acc)
-        avg_precision = sum(val_precision) / len(val_precision)
-        avg_recall = sum(val_recall) / len(val_recall)
+    # Average metrics
+    avg = {k: round(sum(v) / len(v), 4) for k, v in accumulated.items()}
 
-        # MLflow logs (time-series)
-        mlflow.log_metric("val_dice", avg_dice, step=epoch)
-        mlflow.log_metric("val_iou", avg_iou, step=epoch)
-        mlflow.log_metric("val_pixel_accuracy", avg_pixel_acc, step=epoch)
-        mlflow.log_metric("val_precision", avg_precision, step=epoch)
-        mlflow.log_metric("val_recall", avg_recall, step=epoch)
+    # ── Log to MLflow ─────────────────────────────────────────────
+    for k, v in avg.items():
+        mlflow.log_metric(f"val_{k}", v, step=epoch)
 
-    # Extra visuals after the loop
-    if log_images and first_batch_cache is not None:
-        images, masks, preds, logits = first_batch_cache
-        # Grid of first few samples
-        log_sample_grid(images, masks, preds, max_n=6, step=epoch)
+    # ── Log to W&B ────────────────────────────────────────────────
+    if use_wandb and wandb.run is not None:
+        wandb.log({f"val/{k}": v for k, v in avg.items()}, step=epoch)
 
-        # Threshold sweep figure
-        if do_threshold_sweep:
-            from src.mlflow_utils import log_threshold_sweep
-            ths, dvals, ivals = _threshold_sweep_for_batch(logits.to(device), masks.to(device), device)
-            log_threshold_sweep(ths, dvals, ivals, out_path=f"figures/threshold_sweep_epoch_{epoch}.png")
+    # ── Visual Logging ────────────────────────────────────────────
+    if log_images and first_batch is not None:
+        imgs, masks_cpu, preds_cpu, logits_cpu = first_batch
+        n = min(4, imgs.shape[0])
 
-    return {
-        "dice": avg_dice,
-        "iou": avg_iou,
-        "pixel_acc": avg_pixel_acc,
-        "precision": avg_precision,
-        "recall": avg_recall
-    }
+        fig, axes = plt.subplots(n, 3, figsize=(12, 3 * n))
+        if n == 1:
+            axes = np.expand_dims(axes, 0)
+
+        for i in range(n):
+            img_np = imgs[i].squeeze().numpy()
+            gt_np = masks_cpu[i].squeeze().numpy()
+            pr_np = preds_cpu[i].squeeze().numpy()
+
+            axes[i, 0].imshow(img_np, cmap="gray")
+            axes[i, 0].set_title("Input")
+            axes[i, 0].axis("off")
+
+            axes[i, 1].imshow(_make_overlay(img_np, gt_np, "green"))
+            axes[i, 1].set_title(f"Ground Truth")
+            axes[i, 1].axis("off")
+
+            axes[i, 2].imshow(_make_overlay(img_np, pr_np, "red"))
+            axes[i, 2].set_title(f"Prediction")
+            axes[i, 2].axis("off")
+
+        fig.suptitle(f"Epoch {epoch} — Dice: {avg['dice']:.4f} | IoU: {avg['iou']:.4f}")
+        fig.tight_layout()
+
+        os.makedirs("temp_vis", exist_ok=True)
+        save_path = f"temp_vis/val_epoch_{epoch}.png"
+        fig.savefig(save_path, bbox_inches="tight", dpi=100)
+        plt.close(fig)
+
+        mlflow.log_artifact(save_path, artifact_path="predictions")
+
+        if use_wandb and wandb.run is not None:
+            wandb.log({"val/predictions": wandb.Image(save_path)}, step=epoch)
+
+        # Threshold sweep
+        ths, dvals, ivals = _threshold_sweep(logits_cpu, masks_cpu, "cpu")
+        fig2, ax = plt.subplots(figsize=(7, 4))
+        ax.plot(ths, dvals, label="Dice", marker="o", markersize=3)
+        ax.plot(ths, ivals, label="IoU", marker="s", markersize=3)
+        ax.axvline(x=0.5, color="gray", linestyle="--", alpha=0.5, label="threshold=0.5")
+        ax.set_xlabel("Threshold")
+        ax.set_ylabel("Score")
+        ax.set_title(f"Threshold Sweep — Epoch {epoch}")
+        ax.legend()
+        fig2.tight_layout()
+        sweep_path = f"temp_vis/threshold_sweep_{epoch}.png"
+        fig2.savefig(sweep_path, bbox_inches="tight")
+        plt.close(fig2)
+        mlflow.log_artifact(sweep_path, artifact_path="threshold_sweeps")
+
+        if use_wandb and wandb.run is not None:
+            wandb.log({"val/threshold_sweep": wandb.Image(sweep_path)}, step=epoch)
+
+    return avg

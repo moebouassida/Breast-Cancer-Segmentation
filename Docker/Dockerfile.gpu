@@ -1,45 +1,52 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# Breast Ultrasound Segmentation — Docker Image
+# GPU Dockerfile — for local RTX GPU or RunPod deployment
 #
-# CPU (CI / demo):
-#   docker build -t breast-seg-api .
-#   docker run --rm -p 8000:8000 breast-seg-api
-#
-# GPU (local / RunPod):
+# Build:
 #   docker build -f Docker/Dockerfile.gpu -t breast-seg-api-gpu .
-#   docker run --rm --gpus all -p 8000:8000 breast-seg-api-gpu
+#
+# Run locally (requires NVIDIA Container Toolkit):
+#   docker run --rm --gpus all -p 8000:8000 \
+#     -v $(pwd)/checkpoints:/app/checkpoints \
+#     breast-seg-api-gpu
+#
+# Run on RunPod:
+#   Use this image as your RunPod template
+#   Set CHECKPOINT_PATH env var if needed
 # ─────────────────────────────────────────────────────────────────────────────
-FROM python:3.10-slim
+FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
 
-# System dependencies (OpenCV needs these)
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.10 \
+    python3-pip \
+    python3.10-dev \
     libgl1 \
     libglib2.0-0 \
     libsm6 \
     libxrender1 \
     libxext6 \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -s /usr/bin/python3.10 /usr/bin/python
 
 WORKDIR /app
 
-# Install Python dependencies first (for layer caching)
+# Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source
 COPY src/      ./src/
 COPY Data/     ./Data/
-COPY checkpoints/ ./checkpoints/
 
-# Non-root user for security
-RUN useradd -m appuser && chown -R appuser /app
-USER appuser
+# checkpoints are mounted at runtime — not baked into image
+RUN mkdir -p checkpoints
 
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 CMD ["uvicorn", "src.app:app", "--host", "0.0.0.0", "--port", "8000"]
