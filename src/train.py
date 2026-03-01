@@ -6,6 +6,7 @@ Usage:
     python src/train.py --epochs 50 --lr 5e-4 --batch-size 16
     python src/train.py --resume checkpoints/best.pt
 """
+
 import argparse
 import os
 import json
@@ -18,6 +19,7 @@ import mlflow
 import mlflow.pytorch
 import wandb
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
@@ -30,6 +32,7 @@ from Data.data_loader import get_dataloaders
 
 
 # ── Checkpoint Helpers ────────────────────────────────────────────────────────
+
 
 def save_checkpoint(path: str, model, optimizer, epoch: int, best_val: float):
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
@@ -61,6 +64,7 @@ def load_checkpoint(path: str, model, optimizer, device: str):
 
 # ── Learning Curve Logger ─────────────────────────────────────────────────────
 
+
 def log_learning_curves(history: dict, path: str = "figures/learning_curves.png"):
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
@@ -74,10 +78,16 @@ def log_learning_curves(history: dict, path: str = "figures/learning_curves.png"
     ax1.legend()
     ax1.grid(alpha=0.3)
 
-    for metric, color in [("val_dice", "steelblue"), ("val_iou", "seagreen"),
-                          ("val_precision", "darkorange"), ("val_recall", "purple")]:
+    for metric, color in [
+        ("val_dice", "steelblue"),
+        ("val_iou", "seagreen"),
+        ("val_precision", "darkorange"),
+        ("val_recall", "purple"),
+    ]:
         if metric in history:
-            ax2.plot(epochs, history[metric], label=metric.replace("val_", ""), color=color)
+            ax2.plot(
+                epochs, history[metric], label=metric.replace("val_", ""), color=color
+            )
     ax2.set_title("Validation Metrics")
     ax2.set_xlabel("Epoch")
     ax2.set_ylabel("Score")
@@ -94,6 +104,7 @@ def log_learning_curves(history: dict, path: str = "figures/learning_curves.png"
 
 
 # ── Main Training Function ────────────────────────────────────────────────────
+
 
 def train(cfg: Config):
     print(f"\n{'='*60}")
@@ -152,22 +163,28 @@ def train(cfg: Config):
     mlflow.set_experiment(cfg.mlflow_experiment)
 
     history = {
-        "train_loss": [], "val_dice": [], "val_iou": [],
-        "val_precision": [], "val_recall": [], "val_f1": [],
+        "train_loss": [],
+        "val_dice": [],
+        "val_iou": [],
+        "val_precision": [],
+        "val_recall": [],
+        "val_f1": [],
     }
 
     with mlflow.start_run(run_name=f"UNet_bs{cfg.batch_size}_lr{cfg.learning_rate}"):
         # Log params to MLflow
         mlflow.set_tags({"model": "UNet", "dataset": cfg.dataset_name})
-        mlflow.log_params({
-            "epochs": cfg.epochs,
-            "batch_size": cfg.batch_size,
-            "learning_rate": cfg.learning_rate,
-            "img_size": cfg.img_size,
-            "num_params": num_params,
-            "optimizer": "Adam",
-            "loss": "BCEWithLogitsLoss",
-        })
+        mlflow.log_params(
+            {
+                "epochs": cfg.epochs,
+                "batch_size": cfg.batch_size,
+                "learning_rate": cfg.learning_rate,
+                "img_size": cfg.img_size,
+                "num_params": num_params,
+                "optimizer": "Adam",
+                "loss": "BCEWithLogitsLoss",
+            }
+        )
 
         os.makedirs(cfg.checkpoint_dir, exist_ok=True)
 
@@ -190,7 +207,9 @@ def train(cfg: Config):
 
             # Validate
             metrics = validate(
-                model, val_loader, cfg.device,
+                model,
+                val_loader,
+                cfg.device,
                 epoch=epoch,
                 log_images=(epoch % cfg.save_every == 0),
                 use_wandb=True,
@@ -214,9 +233,7 @@ def train(cfg: Config):
             mlflow.log_metric("learning_rate", current_lr, step=epoch)
 
             if wandb.run is not None:
-                wandb.log(
-                    {"train/loss": avg_loss, "train/lr": current_lr}, step=epoch
-                )
+                wandb.log({"train/loss": avg_loss, "train/lr": current_lr}, step=epoch)
 
             # Update history
             history["train_loss"].append(avg_loss)
@@ -250,6 +267,7 @@ def train(cfg: Config):
 
         # Save per-epoch metrics CSV
         import pandas as pd
+
         os.makedirs("metrics", exist_ok=True)
         pd.DataFrame({"epoch": range(len(history["train_loss"])), **history}).to_csv(
             "metrics/per_epoch.csv", index=False
@@ -270,7 +288,8 @@ def train(cfg: Config):
         # Log final model to MLflow registry
         example = torch.randn(1, 1, cfg.img_size, cfg.img_size).to(cfg.device)
         mlflow.pytorch.log_model(
-            model, "model",
+            model,
+            "model",
             registered_model_name=cfg.model_name,
             input_example=example,
         )
@@ -286,7 +305,9 @@ def train(cfg: Config):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train breast ultrasound segmentation model")
+    parser = argparse.ArgumentParser(
+        description="Train breast ultrasound segmentation model"
+    )
     parser.add_argument("--epochs", type=int, default=None)
     parser.add_argument("--lr", type=float, default=None)
     parser.add_argument("--batch-size", type=int, default=None)
@@ -295,15 +316,15 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     cfg = Config()
-    if args.epochs:      
+    if args.epochs:
         cfg.epochs = args.epochs
-    if args.lr:          
+    if args.lr:
         cfg.learning_rate = args.lr
-    if args.batch_size:  
+    if args.batch_size:
         cfg.batch_size = args.batch_size
-    if args.img_size:    
+    if args.img_size:
         cfg.img_size = args.img_size
-    if args.resume:      
+    if args.resume:
         cfg.resume_from = args.resume
 
     train(cfg)

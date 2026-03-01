@@ -6,6 +6,7 @@ Usage:
     inf = SegmentationInference()
     mask = inf.predict("path/to/image.png")
 """
+
 import os
 import torch
 import numpy as np
@@ -42,21 +43,27 @@ class SegmentationInference:
         if os.getenv("MLFLOW_TRACKING_URI") or os.path.exists("Experiments/mlruns"):
             try:
                 import mlflow.pytorch
-                tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "file:Experiments/mlruns")
+
+                tracking_uri = os.getenv(
+                    "MLFLOW_TRACKING_URI", "file:Experiments/mlruns"
+                )
                 mlflow.set_tracking_uri(tracking_uri)
-                model = mlflow.pytorch.load_model(
-                    f"models:/{model_name}/{stage}"
-                ).to(self.device)
+                model = mlflow.pytorch.load_model(f"models:/{model_name}/{stage}").to(
+                    self.device
+                )
                 print(f"[inference] Loaded from MLflow registry: {model_name}/{stage}")
                 return model
             except Exception as e:
-                print(f"[inference] MLflow registry unavailable ({e}), falling back to checkpoint")
+                print(
+                    f"[inference] MLflow registry unavailable ({e}), falling back to checkpoint"
+                )
 
         # Fallback to local checkpoint
         if checkpoint_path is None:
             checkpoint_path = "checkpoints/best.pt"
 
         from src.model import UNet
+
         model = UNet(in_channels=1, out_channels=1).to(self.device)
         ckpt = torch.load(checkpoint_path, map_location=self.device)
         state = ckpt.get("model_state", ckpt)
@@ -95,11 +102,15 @@ class SegmentationInference:
 
         # Resize back to original resolution
         from PIL import Image as PILImage
-        mask = np.array(
-            PILImage.fromarray((mask_small * 255).astype(np.uint8)).resize(
-                orig_size, PILImage.NEAREST
+
+        mask = (
+            np.array(
+                PILImage.fromarray((mask_small * 255).astype(np.uint8)).resize(
+                    orig_size, PILImage.NEAREST
+                )
             )
-        ) / 255.0
+            / 255.0
+        )
 
         if not return_overlay:
             return mask

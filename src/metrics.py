@@ -51,10 +51,10 @@ def f1_score(preds: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
 def compute_all_metrics(preds: torch.Tensor, targets: torch.Tensor) -> dict:
     """Compute all metrics in one call. Returns a plain dict of floats."""
     return {
-        "dice":           dice_score(preds, targets).item(),
-        "iou":            iou_score(preds, targets).item(),
+        "dice": dice_score(preds, targets).item(),
+        "iou": iou_score(preds, targets).item(),
         "pixel_accuracy": pixel_accuracy(preds, targets).item(),
-        "precision":      precision_score(preds, targets).item(),
-        "recall":         recall_score(preds, targets).item(),
-        "f1":             f1_score(preds, targets).item(),
+        "precision": precision_score(preds, targets).item(),
+        "recall": recall_score(preds, targets).item(),
+        "f1": f1_score(preds, targets).item(),
     }

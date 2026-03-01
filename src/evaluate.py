@@ -10,6 +10,7 @@ Exit codes:
     0 — passed all quality gates
     1 — failed one or more quality gates
 """
+
 import argparse
 import json
 import os
@@ -47,6 +48,7 @@ def load_model(checkpoint_path: str, device: str) -> torch.nn.Module:
 def get_loader(cfg, split: str):
     try:
         from Data.data_loader import get_dataloaders
+
         train_loader, val_loader, test_loader = get_dataloaders(cfg)
         return {"train": train_loader, "val": val_loader, "test": test_loader}[split]
     except Exception as e:
@@ -56,15 +58,20 @@ def get_loader(cfg, split: str):
 
 def _synthetic_loader(cfg):
     class Syn(torch.utils.data.Dataset):
-        def __len__(self): return 32
+        def __len__(self):
+            return 32
+
         def __getitem__(self, _):
             img = torch.rand(1, cfg.img_size, cfg.img_size)
             mask = (torch.rand(1, cfg.img_size, cfg.img_size) > 0.5).float()
             return img, mask
+
     return torch.utils.data.DataLoader(Syn(), batch_size=cfg.batch_size)
 
 
-def evaluate(checkpoint_path: str, split: str = "test", output_json: str = None) -> bool:
+def evaluate(
+    checkpoint_path: str, split: str = "test", output_json: str = None
+) -> bool:
     cfg = Config()
     device = cfg.device
 
@@ -79,7 +86,9 @@ def evaluate(checkpoint_path: str, split: str = "test", output_json: str = None)
     model = load_model(checkpoint_path, device)
     loader = get_loader(cfg, split)
 
-    accumulated = {k: [] for k in ["dice", "iou", "pixel_accuracy", "precision", "recall", "f1"]}
+    accumulated = {
+        k: [] for k in ["dice", "iou", "pixel_accuracy", "precision", "recall", "f1"]
+    }
 
     with torch.no_grad():
         for images, masks in loader:
@@ -94,10 +103,10 @@ def evaluate(checkpoint_path: str, split: str = "test", output_json: str = None)
 
     # Quality gates from config
     gates = {
-        "dice":      cfg.gate_dice,
-        "iou":       cfg.gate_iou,
+        "dice": cfg.gate_dice,
+        "iou": cfg.gate_iou,
         "precision": cfg.gate_precision,
-        "recall":    cfg.gate_recall,
+        "recall": cfg.gate_recall,
     }
 
     # Print results table
@@ -114,7 +123,9 @@ def evaluate(checkpoint_path: str, split: str = "test", output_json: str = None)
         note = "  ← BELOW THRESHOLD" if not passed else ""
         print(f"  {metric:<20} {value:>8.4f}   {threshold:>10.4f}   {status}{note}")
 
-    print(f"  {'pixel_accuracy':<20} {metrics['pixel_accuracy']:>8.4f}   {'(no gate)':>10}")
+    print(
+        f"  {'pixel_accuracy':<20} {metrics['pixel_accuracy']:>8.4f}   {'(no gate)':>10}"
+    )
     print(f"  {'f1':<20} {metrics['f1']:>8.4f}   {'(no gate)':>10}")
     print(f"\n  Batches: {len(accumulated['dice'])}")
     print(f"{'='*58}")
@@ -128,13 +139,17 @@ def evaluate(checkpoint_path: str, split: str = "test", output_json: str = None)
     if output_json:
         os.makedirs(os.path.dirname(output_json) or ".", exist_ok=True)
         with open(output_json, "w") as f:
-            json.dump({
-                "metrics": metrics,
-                "gates": gates,
-                "passed": passed_all,
-                "checkpoint": checkpoint_path,
-                "split": split,
-            }, f, indent=2)
+            json.dump(
+                {
+                    "metrics": metrics,
+                    "gates": gates,
+                    "passed": passed_all,
+                    "checkpoint": checkpoint_path,
+                    "split": split,
+                },
+                f,
+                indent=2,
+            )
         print(f"  Results saved → {output_json}")
 
     return passed_all

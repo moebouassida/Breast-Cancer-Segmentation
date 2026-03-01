@@ -30,7 +30,9 @@ def log_learning_curves(history: dict, out_path="figures/learning_curves.png"):
     plt.close(fig)
 
 
-def log_threshold_sweep(thresholds, dice_vals, iou_vals, out_path="figures/threshold_sweep.png"):
+def log_threshold_sweep(
+    thresholds, dice_vals, iou_vals, out_path="figures/threshold_sweep.png"
+):
     """Plot dice & iou vs threshold."""
     fig, ax = plt.subplots(figsize=(7, 4))
     ax.plot(thresholds, dice_vals, label="dice")

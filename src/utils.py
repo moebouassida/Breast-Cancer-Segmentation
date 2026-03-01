@@ -44,7 +44,9 @@ def _to_hw_mask(mask: np.ndarray) -> np.ndarray:
         else:
             m = m.reshape(m.shape[-2], m.shape[-1])
     if m.ndim != 2:
-        raise ValueError(f"Unsupported mask shape {mask.shape}, expected 2D after squeeze.")
+        raise ValueError(
+            f"Unsupported mask shape {mask.shape}, expected 2D after squeeze."
+        )
     m = (m > 0.5).astype(np.float32)
     return m
 
@@ -70,9 +72,15 @@ def log_prediction_visual(image, mask_true, mask_pred, step=0):
     pr_overlay[..., 0] = np.maximum(pr_overlay[..., 0], pr)  # R
 
     fig, axes = plt.subplots(1, 3, figsize=(12, 4))
-    axes[0].imshow(img); axes[0].set_title("Original"); axes[0].axis("off")
-    axes[1].imshow(gt_overlay); axes[1].set_title("Ground Truth"); axes[1].axis("off")
-    axes[2].imshow(pr_overlay); axes[2].set_title("Prediction"); axes[2].axis("off")
+    axes[0].imshow(img)
+    axes[0].set_title("Original")
+    axes[0].axis("off")
+    axes[1].imshow(gt_overlay)
+    axes[1].set_title("Ground Truth")
+    axes[1].axis("off")
+    axes[2].imshow(pr_overlay)
+    axes[2].set_title("Prediction")
+    axes[2].axis("off")
 
     os.makedirs("temp_vis", exist_ok=True)
     save_path = f"temp_vis/prediction_step_{step}.png"
@@ -113,9 +121,15 @@ def log_sample_grid(images, masks_true, masks_pred, max_n=6, step=0):
         gt_overlay[..., 1] = np.maximum(gt_overlay[..., 1], gt)
         pr_overlay[..., 0] = np.maximum(pr_overlay[..., 0], pr)
 
-        axes[i, 0].imshow(img); axes[i, 0].set_title("Original"); axes[i, 0].axis("off")
-        axes[i, 1].imshow(gt_overlay); axes[i, 1].set_title("GT"); axes[i, 1].axis("off")
-        axes[i, 2].imshow(pr_overlay); axes[i, 2].set_title("Pred"); axes[i, 2].axis("off")
+        axes[i, 0].imshow(img)
+        axes[i, 0].set_title("Original")
+        axes[i, 0].axis("off")
+        axes[i, 1].imshow(gt_overlay)
+        axes[i, 1].set_title("GT")
+        axes[i, 1].axis("off")
+        axes[i, 2].imshow(pr_overlay)
+        axes[i, 2].set_title("Pred")
+        axes[i, 2].axis("off")
 
     os.makedirs("temp_vis", exist_ok=True)
     save_path = f"temp_vis/grid_step_{step}.png"

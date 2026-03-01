@@ -6,6 +6,7 @@ Endpoints:
     POST /predict      — upload image → segmentation mask + overlay
     GET  /gradio       — interactive Gradio demo
 """
+
 import io
 import os
 import base64
@@ -36,7 +37,7 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 app = FastAPI(
     title="Breast Ultrasound Segmentation API",
     description="U-Net segmentation of breast ultrasound images. "
-                "Trained on the BUSI dataset.",
+    "Trained on the BUSI dataset.",
     version="1.0.0",
 )
 
@@ -47,8 +48,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
 
 
 class ModelWrapper:
@@ -102,7 +101,9 @@ def to_b64_png(arr: np.ndarray) -> str:
     return base64.b64encode(buf.getvalue()).decode("ascii")
 
 
-def make_overlay(gray01: np.ndarray, mask01: np.ndarray, alpha: float = 0.5) -> np.ndarray:
+def make_overlay(
+    gray01: np.ndarray, mask01: np.ndarray, alpha: float = 0.5
+) -> np.ndarray:
     """Red overlay of segmentation mask on grayscale image."""
     rgb = np.stack([gray01, gray01, gray01], axis=-1)
     overlay = rgb.copy()

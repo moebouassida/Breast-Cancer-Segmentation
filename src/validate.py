@@ -3,6 +3,7 @@ import mlflow
 import wandb
 import numpy as np
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import os
@@ -45,7 +46,9 @@ def validate(
     Returns dict of averaged metrics.
     """
     model.eval()
-    accumulated = {k: [] for k in ["dice", "iou", "pixel_accuracy", "precision", "recall", "f1"]}
+    accumulated = {
+        k: [] for k in ["dice", "iou", "pixel_accuracy", "precision", "recall", "f1"]
+    }
     first_batch = None
 
     with torch.no_grad():
@@ -121,7 +124,9 @@ def validate(
         fig2, ax = plt.subplots(figsize=(7, 4))
         ax.plot(ths, dvals, label="Dice", marker="o", markersize=3)
         ax.plot(ths, ivals, label="IoU", marker="s", markersize=3)
-        ax.axvline(x=0.5, color="gray", linestyle="--", alpha=0.5, label="threshold=0.5")
+        ax.axvline(
+            x=0.5, color="gray", linestyle="--", alpha=0.5, label="threshold=0.5"
+        )
         ax.set_xlabel("Threshold")
         ax.set_ylabel("Score")
         ax.set_title(f"Threshold Sweep — Epoch {epoch}")
