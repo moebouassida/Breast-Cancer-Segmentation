@@ -96,11 +96,11 @@ def validate(
             axes[i, 0].axis("off")
 
             axes[i, 1].imshow(_make_overlay(img_np, gt_np, "green"))
-            axes[i, 1].set_title(f"Ground Truth")
+            axes[i, 1].set_title("Ground Truth")
             axes[i, 1].axis("off")
 
             axes[i, 2].imshow(_make_overlay(img_np, pr_np, "red"))
-            axes[i, 2].set_title(f"Prediction")
+            axes[i, 2].set_title("Prediction")
             axes[i, 2].axis("off")
 
         fig.suptitle(f"Epoch {epoch} — Dice: {avg['dice']:.4f} | IoU: {avg['iou']:.4f}")

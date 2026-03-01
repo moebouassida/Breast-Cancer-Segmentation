@@ -18,6 +18,8 @@ import torch
 import torchvision.transforms as T
 from PIL import Image
 
+from src.model import UNet
+
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 import gradio as gr
@@ -46,8 +48,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Model ─────────────────────────────────────────────────────────────────────
-from src.model import UNet
+
 
 
 class ModelWrapper:

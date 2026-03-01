@@ -69,7 +69,7 @@ def evaluate(checkpoint_path: str, split: str = "test", output_json: str = None)
     device = cfg.device
 
     print(f"\n{'='*58}")
-    print(f"  Breast Ultrasound Segmentation — Evaluation")
+    print("  Breast Ultrasound Segmentation — Evaluation")
     print(f"{'='*58}")
     print(f"  Checkpoint : {checkpoint_path}")
     print(f"  Split      : {split}")

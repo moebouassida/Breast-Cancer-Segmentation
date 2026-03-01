@@ -97,7 +97,7 @@ def log_learning_curves(history: dict, path: str = "figures/learning_curves.png"
 
 def train(cfg: Config):
     print(f"\n{'='*60}")
-    print(f"  Breast Ultrasound Segmentation — Training")
+    print("  Breast Ultrasound Segmentation — Training")
     print(f"{'='*60}")
     print(f"  Device   : {cfg.device}")
     print(f"  Epochs   : {cfg.epochs}")
@@ -276,7 +276,7 @@ def train(cfg: Config):
         )
 
         print(f"\n{'='*60}")
-        print(f"  Training complete!")
+        print("  Training complete!")
         print(f"  Best Dice: {best_val:.4f}")
         print(f"  Checkpoint: {os.path.join(cfg.checkpoint_dir, 'best.pt')}")
         print(f"{'='*60}\n")
@@ -295,10 +295,15 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     cfg = Config()
-    if args.epochs:      cfg.epochs = args.epochs
-    if args.lr:          cfg.learning_rate = args.lr
-    if args.batch_size:  cfg.batch_size = args.batch_size
-    if args.img_size:    cfg.img_size = args.img_size
-    if args.resume:      cfg.resume_from = args.resume
+    if args.epochs:      
+        cfg.epochs = args.epochs
+    if args.lr:          
+        cfg.learning_rate = args.lr
+    if args.batch_size:  
+        cfg.batch_size = args.batch_size
+    if args.img_size:    
+        cfg.img_size = args.img_size
+    if args.resume:      
+        cfg.resume_from = args.resume
 
     train(cfg)
