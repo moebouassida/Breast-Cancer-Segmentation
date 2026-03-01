@@ -86,3 +86,70 @@ jobs:
             exit 1
           fi
           echo "✅ Container started successfully"
+  
+  # ── 4. Deploy to HuggingFace Spaces ────────────────────────────────────────
+  # Only runs on push to main (not on PRs)
+  deploy-hf-spaces:
+    name: Deploy to HuggingFace Spaces
+    runs-on: ubuntu-latest
+    needs: docker
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install huggingface_hub
+        run: pip install huggingface_hub
+
+      - name: Deploy to HuggingFace Spaces
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_USERNAME: ${{ secrets.HF_USERNAME }}
+        run: |
+          python - <<'EOF'
+          import os
+          from huggingface_hub import HfApi
+
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          username = os.environ["HF_USERNAME"]
+          repo_id = f"{username}/breast-ultrasound-segmentation"
+
+          # Create Space if it doesn't exist
+          try:
+              api.create_repo(
+                  repo_id=repo_id,
+                  repo_type="space",
+                  space_sdk="gradio",
+                  exist_ok=True,
+              )
+              print(f"Space ready: {repo_id}")
+          except Exception as e:
+              print(f"Repo creation: {e}")
+
+          # Upload files
+          files_to_upload = [
+              ("hf_spaces_app.py", "app.py"),   # HF expects app.py at root
+              ("src/model.py",     "src/model.py"),
+              ("src/config.py",    "src/config.py"),
+              ("requirements.txt", "requirements.txt"),
+          ]
+
+          for local_path, hf_path in files_to_upload:
+              if os.path.exists(local_path):
+                  api.upload_file(
+                      path_or_fileobj=local_path,
+                      path_in_repo=hf_path,
+                      repo_id=repo_id,
+                      repo_type="space",
+                  )
+                  print(f"Uploaded: {local_path} → {hf_path}")
+
+          print(f"\n✅ Deployed to: https://huggingface.co/spaces/{repo_id}")
+          EOF

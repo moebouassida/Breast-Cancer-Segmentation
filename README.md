@@ -14,11 +14,11 @@
 
 | Metric | Score |
 |---|---|
-| **Dice Coefficient** | `0.XX` |
-| **IoU (Jaccard)** | `0.XX` |
-| **Precision** | `0.XX` |
-| **Recall (Sensitivity)** | `0.XX` |
-| **Pixel Accuracy** | `0.XX` |
+| **Dice Coefficient**     | `0.73` |
+| **IoU (Jaccard)**        | `0.66` |
+| **Precision**            | `0.80` |
+| **Recall (Sensitivity)** | `0.71` |
+| **Pixel Accuracy**       | `0.96` |
 
 > Evaluated on the BUSI test set (benign + malignant + normal classes).  
 > Full experiment history available in [MLflow](#experiment-tracking).
