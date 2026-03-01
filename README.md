@@ -4,6 +4,7 @@
 > Trained on the BUSI dataset · Served via FastAPI · Deployed with Docker · CI/CD with GitHub Actions.
 
 ![CI Pipeline](https://github.com/moebouassida/Breast-Cancer-Segmentation/actions/workflows/ci.yml/badge.svg)
+[![HuggingFace](https://img.shields.io/badge/🤗%20Demo-HuggingFace%20Spaces-yellow)](https://huggingface.co/spaces/moebouassida/breast-ultrasound-segmentation)
 ![Python](https://img.shields.io/badge/python-3.10-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.0-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -27,9 +28,7 @@
 
 ## 🎥 Demo
 
-![Gradio Demo](Assets/demo.png)
-
-**Live demo:** Run locally with Docker (see [Quick Start](#-quick-start)) and open `http://localhost:8000/gradio`
+[![HuggingFace Demo](https://img.shields.io/badge/▶%20Try%20Live%20Demo-HuggingFace%20Spaces-yellow?style=for-the-badge)](https://huggingface.co/spaces/moebouassida/breast-ultrasound-segmentation)
 
 ---
 
@@ -53,7 +52,7 @@ Custom U-Net with:
 - BatchNorm after every convolution
 - Skip connections between encoder and decoder
 - BCEWithLogitsLoss for training stability
-- Adam optimizer with lr=1e-3
+- Adam optimizer with lr=5e-4
 
 ---
 
@@ -246,6 +245,8 @@ Push → Code Quality (ruff + black)
        Unit Tests (pytest)
           ↓
        Docker Build + Smoke Test (/health)
+          ↓
+       Deploy to HuggingFace Spaces 🤗
 ```
 
 Tests cover:
@@ -261,8 +262,10 @@ Tests cover:
 |---|---|
 | Deep Learning | PyTorch |
 | Medical CV Framework | MONAI-compatible transforms |
-| Experiment Tracking | MLflow |
+| Experiment Tracking | MLflow + W&B|
+| Data Versioning     | DVC          |
 | API Serving | FastAPI |
+| Demo Hosting        | HuggingFace Spaces |
 | Interactive Demo | Gradio |
 | Containerization | Docker + NVIDIA Container Toolkit |
 | CI/CD | GitHub Actions |
@@ -280,4 +283,5 @@ MIT License — free to use and modify.
 
 **Moez Bouassida** — AI/ML Engineer · Medical Imaging & VLMs  
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-blue)](https://www.linkedin.com/in/moezbouassida/)
+
 [![GitHub](https://img.shields.io/badge/GitHub-Follow-black)](https://github.com/moebouassida)
