@@ -22,7 +22,7 @@
 | **Pixel Accuracy**       | `0.96` |
 
 > Evaluated on the BUSI test set (benign + malignant + normal classes).  
-> Full experiment history available in [MLflow](#experiment-tracking).
+> Training tracked with W&B — [view experiment dashboard](https://wandb.ai/moebouassida-soci-t-g-n-rale/breast-ultrasound-segmentation).
 
 ---
 
@@ -285,4 +285,5 @@ MIT License — free to use and modify.
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-blue)](https://www.linkedin.com/in/moezbouassida/)
 
 [![GitHub](https://img.shields.io/badge/GitHub-Follow-black)](https://github.com/moebouassida)
+
 
