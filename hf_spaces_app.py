@@ -258,4 +258,3 @@ with gr.Blocks(title="🩺 Breast Cancer Segmentation") as demo:
 
 if __name__ == "__main__":
     demo.launch(theme=gr.themes.Soft())
-
