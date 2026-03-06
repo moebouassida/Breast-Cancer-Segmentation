@@ -50,10 +50,10 @@ app.add_middleware(
 )
 
 # ── Middleware ─────────────────────────────────────────────────
-from medical_middleware import setup_middleware # noqa: E402
-from medical_middleware.config import MiddlewareConfig # noqa: E402
-from medical_middleware.storage import get_s3_client # noqa: E402
-from medical_middleware.storage.retention_s3 import S3RetentionManager # noqa: E402
+from medical_middleware import setup_middleware  # noqa: E402
+from medical_middleware.config import MiddlewareConfig  # noqa: E402
+from medical_middleware.storage import get_s3_client  # noqa: E402
+from medical_middleware.storage.retention_s3 import S3RetentionManager  # noqa: E402
 
 middleware_cfg = MiddlewareConfig(
     app_name="breast-cancer-api",
