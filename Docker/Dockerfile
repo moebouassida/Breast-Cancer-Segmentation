@@ -29,7 +29,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source
 COPY src/      ./src/
-COPY Data/     ./Data/
 COPY checkpoints/ ./checkpoints/
 
 # Non-root user for security
