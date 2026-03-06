@@ -151,7 +151,8 @@ def tab_erase(request_id):
 
 
 # ── Gradio UI ──────────────────────────────────────────────────
-with gr.Blocks(title="🩺 Breast Cancer Segmentation", theme=gr.themes.Soft()) as demo:
+with gr.Blocks(title="🩺 Breast Cancer Segmentation") as demo:
+
     gr.Markdown(
         """
     # 🩺 Breast Ultrasound Segmentation
@@ -256,4 +257,5 @@ with gr.Blocks(title="🩺 Breast Cancer Segmentation", theme=gr.themes.Soft()) 
     )
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(theme=gr.themes.Soft())
+
