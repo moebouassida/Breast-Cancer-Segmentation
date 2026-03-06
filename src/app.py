@@ -71,13 +71,15 @@ retention = S3RetentionManager(s3_client=s3) if s3.available else None
 class ModelWrapper:
     def __init__(self, checkpoint_path, device="cpu"):
         self.device = device
-        self.model = UNet(in_channels=1, out_channels=1).to(device)
-        if not checkpoint_path.exists():
-            raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
-        ckpt = torch.load(str(checkpoint_path), map_location=device, weights_only=True)
-        state = ckpt.get("model_state", ckpt)
-        state = {k.replace("module.", "", 1): v for k, v in state.items()}
-        self.model.load_state_dict(state, strict=False)
+        self.model  = UNet(in_channels=1, out_channels=1).to(device)
+        if checkpoint_path.exists():
+            ckpt  = torch.load(str(checkpoint_path), map_location=device, weights_only=True)
+            state = ckpt.get("model_state", ckpt)
+            state = {k.replace("module.", "", 1): v for k, v in state.items()}
+            self.model.load_state_dict(state, strict=False)
+            print(f"[model] Loaded checkpoint: {checkpoint_path}")
+        else:
+            print(f"[model] No checkpoint found — running with random weights (demo mode)")
         self.model.eval()
 
     @torch.no_grad()
