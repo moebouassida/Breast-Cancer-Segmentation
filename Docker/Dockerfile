@@ -25,6 +25,15 @@ WORKDIR /app
 
 # Install Python dependencies first (for layer caching)
 COPY requirements.txt .
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxrender1 \
+    libxext6 \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source
