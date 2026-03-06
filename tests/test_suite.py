@@ -2,6 +2,7 @@
 Comprehensive unit tests — run in CI without GPU or real data.
     pytest tests/ -v
 """
+
 import os
 import sys
 import pytest
@@ -17,10 +18,12 @@ class TestUNet:
     @pytest.fixture(autouse=True)
     def setup(self):
         from src.model import UNet
+
         self.model = UNet(in_channels=1, out_channels=1).eval()
 
     def test_instantiation(self):
         from src.model import UNet
+
         assert UNet(in_channels=1, out_channels=1) is not None
 
     def test_output_shape_128(self):
@@ -65,6 +68,7 @@ class TestUNet:
 
     def test_parameter_count_reasonable(self):
         from src.model import count_parameters
+
         n = count_parameters(self.model)
         assert 1_000_000 < n < 100_000_000, f"Unexpected param count: {n:,}"
 
@@ -75,9 +79,15 @@ class TestMetrics:
     @pytest.fixture(autouse=True)
     def setup(self):
         from src.metrics import (
-            dice_score, iou_score, pixel_accuracy,
-            precision_score, recall_score, f1_score, compute_all_metrics
+            dice_score,
+            iou_score,
+            pixel_accuracy,
+            precision_score,
+            recall_score,
+            f1_score,
+            compute_all_metrics,
         )
+
         self.dice = dice_score
         self.iou = iou_score
         self.acc = pixel_accuracy
@@ -156,6 +166,7 @@ class TestConfig:
     @pytest.fixture(autouse=True)
     def setup(self):
         from src.config import Config
+
         self.cfg = Config()
 
     def test_img_size_divisible_by_16(self):
@@ -178,8 +189,12 @@ class TestConfig:
         assert total < 1.0  # remainder goes to test
 
     def test_quality_gates_in_range(self):
-        for gate in [self.cfg.gate_dice, self.cfg.gate_iou,
-                     self.cfg.gate_precision, self.cfg.gate_recall]:
+        for gate in [
+            self.cfg.gate_dice,
+            self.cfg.gate_iou,
+            self.cfg.gate_precision,
+            self.cfg.gate_recall,
+        ]:
             assert 0.0 < gate < 1.0
 
 
@@ -189,6 +204,7 @@ class TestPreprocessing:
     def test_transform_shape(self):
         import torchvision.transforms as T
         from PIL import Image
+
         transform = T.Compose([T.Resize((128, 128)), T.ToTensor()])
         img = Image.fromarray(
             np.random.randint(0, 255, (300, 200), dtype=np.uint8), mode="L"
@@ -199,6 +215,7 @@ class TestPreprocessing:
     def test_transform_value_range(self):
         import torchvision.transforms as T
         from PIL import Image
+
         transform = T.Compose([T.Resize((128, 128)), T.ToTensor()])
         img = Image.fromarray(
             np.random.randint(0, 255, (128, 128), dtype=np.uint8), mode="L"
@@ -229,22 +246,24 @@ class TestBUSIDataset:
 
     @pytest.mark.skipif(
         not os.path.exists("Data/Dataset_BUSI_with_GT"),
-        reason="BUSI dataset not available"
+        reason="BUSI dataset not available",
     )
     def test_dataset_loads(self):
         from Data.data_loader import BUSIDataset
         from src.config import Config
+
         cfg = Config()
         ds = BUSIDataset(cfg.data_root, cfg.img_size)
         assert len(ds) > 0
 
     @pytest.mark.skipif(
         not os.path.exists("Data/Dataset_BUSI_with_GT"),
-        reason="BUSI dataset not available"
+        reason="BUSI dataset not available",
     )
     def test_dataset_item_shapes(self):
         from Data.data_loader import BUSIDataset
         from src.config import Config
+
         cfg = Config()
         ds = BUSIDataset(cfg.data_root, cfg.img_size)
         img, mask = ds[0]

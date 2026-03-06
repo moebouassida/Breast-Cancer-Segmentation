@@ -1,19 +1,22 @@
 """
-app.py — FastAPI + Gradio inference server.
+app.py — FastAPI + Breast Cancer U-Net Segmentation.
 
 Endpoints:
-    GET  /health       — liveness check
-    POST /predict      — upload image → segmentation mask + overlay
-    GET  /gradio       — interactive Gradio demo
+    GET    /health              — liveness check
+    POST   /predict             — upload image → mask + overlay
+    POST   /explain/predict     — upload image → mask + Grad-CAM heatmap
+    GET    /explain/methods     — XAI method info
+    GET    /metrics             — Prometheus metrics
+    GET    /gdpr/status         — GDPR compliance status
+    DELETE /gdpr/erase/{id}     — right to erasure
 """
 
+import base64
 import io
 import os
-import base64
 from pathlib import Path
 from typing import Optional
 
-import cv2
 import numpy as np
 import torch
 import torchvision.transforms as T
@@ -21,11 +24,10 @@ from PIL import Image
 
 from src.model import UNet
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-import gradio as gr
 
-# ── Config ────────────────────────────────────────────────────────────────────
+# ── Config ────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_CKPT = BASE_DIR / "checkpoints" / "best.pt"
 CHECKPOINT_PATH = Path(os.getenv("CHECKPOINT_PATH", str(DEFAULT_CKPT)))
@@ -33,14 +35,12 @@ IMG_SIZE = int(os.getenv("IMG_SIZE", "128"))
 THRESHOLD = float(os.getenv("THRESHOLD", "0.5"))
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-# ── App ───────────────────────────────────────────────────────────────────────
+# ── App ───────────────────────────────────────────────────────
 app = FastAPI(
     title="Breast Ultrasound Segmentation API",
-    description="U-Net segmentation of breast ultrasound images. "
-    "Trained on the BUSI dataset.",
+    description="U-Net segmentation of breast ultrasound images. Trained on BUSI dataset.",
     version="1.0.0",
 )
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv("CORS_ALLOW_ORIGINS", "*").split(","),
@@ -49,50 +49,63 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── Middleware ─────────────────────────────────────────────────
+from medical_middleware import setup_middleware # noqa: E402
+from medical_middleware.config import MiddlewareConfig # noqa: E402
+from medical_middleware.storage import get_s3_client # noqa: E402
+from medical_middleware.storage.retention_s3 import S3RetentionManager # noqa: E402
 
+middleware_cfg = MiddlewareConfig(
+    app_name="breast-cancer-api",
+    consent_required_paths=["/predict", "/explain/predict"],
+    csp_policy="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:",
+)
+setup_middleware(app, middleware_cfg)
+
+# ── S3 singleton ──────────────────────────────────────────────
+s3 = get_s3_client()
+retention = S3RetentionManager(s3_client=s3) if s3.available else None
+
+
+# ── Model ─────────────────────────────────────────────────────
 class ModelWrapper:
-    def __init__(self, checkpoint_path: Path, device: str = "cpu"):
+    def __init__(self, checkpoint_path, device="cpu"):
         self.device = device
         self.model = UNet(in_channels=1, out_channels=1).to(device)
-
         if not checkpoint_path.exists():
-            raise FileNotFoundError(
-                f"Checkpoint not found: {checkpoint_path}. "
-                "Train the model first or set CHECKPOINT_PATH env var."
-            )
-
-        ckpt = torch.load(str(checkpoint_path), map_location=device)
+            raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
+        ckpt = torch.load(str(checkpoint_path), map_location=device, weights_only=True)
         state = ckpt.get("model_state", ckpt)
         state = {k.replace("module.", "", 1): v for k, v in state.items()}
-        missing, unexpected = self.model.load_state_dict(state, strict=False)
-        if missing:
-            print(f"[warn] missing keys: {missing}")
+        self.model.load_state_dict(state, strict=False)
         self.model.eval()
-        print(f"[model] loaded from {checkpoint_path} on {device}")
 
     @torch.no_grad()
-    def predict(self, tensor: torch.Tensor, threshold: float = 0.5) -> torch.Tensor:
-        logits = self.model(tensor.to(self.device))
-        return (torch.sigmoid(logits) > threshold).float()
+    def predict(self, tensor, threshold=0.5):
+        return (torch.sigmoid(self.model(tensor.to(self.device))) > threshold).float()
 
 
-_model: Optional[ModelWrapper] = None
+_model_wrapper: Optional[ModelWrapper] = None
 
 
 def get_model() -> ModelWrapper:
-    global _model
-    if _model is None:
-        _model = ModelWrapper(CHECKPOINT_PATH, device=DEVICE)
-    return _model
+    global _model_wrapper
+    if _model_wrapper is None:
+        _model_wrapper = ModelWrapper(CHECKPOINT_PATH, DEVICE)
+    return _model_wrapper
 
 
-# ── Transforms ────────────────────────────────────────────────────────────────
 transform = T.Compose([T.Resize((IMG_SIZE, IMG_SIZE)), T.ToTensor()])
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# ── Startup — preload model ────────────────────────────────────
+@app.on_event("startup")
+async def startup():
+    get_model()
+
+
+# ── Helpers ───────────────────────────────────────────────────
 def to_b64_png(arr: np.ndarray) -> str:
-    """Convert a numpy array (H,W) or (H,W,3) to a base64 PNG string."""
     if arr.max() <= 1.0:
         arr = (arr * 255).astype(np.uint8)
     mode = "RGB" if arr.ndim == 3 else "L"
@@ -104,56 +117,58 @@ def to_b64_png(arr: np.ndarray) -> str:
 def make_overlay(
     gray01: np.ndarray, mask01: np.ndarray, alpha: float = 0.5
 ) -> np.ndarray:
-    """Red overlay of segmentation mask on grayscale image."""
     rgb = np.stack([gray01, gray01, gray01], axis=-1)
     overlay = rgb.copy()
     overlay[..., 0] = np.clip(overlay[..., 0] + mask01 * alpha, 0, 1)
     return overlay
 
 
-# ── Endpoints ─────────────────────────────────────────────────────────────────
+# ── Endpoints ──────────────────────────────────────────────────
 @app.get("/health")
 def health():
     return {
         "status": "ok",
         "device": DEVICE,
-        "img_size": IMG_SIZE,
-        "threshold": THRESHOLD,
-        "model_loaded": CHECKPOINT_PATH.exists(),
+        "model_loaded": _model_wrapper is not None,
         "checkpoint": str(CHECKPOINT_PATH),
+        "s3_enabled": s3.available,
     }
 
 
 @app.post("/predict")
 async def predict(
-    file: UploadFile = File(..., description="Grayscale ultrasound image"),
+    request: Request,
+    file: UploadFile = File(...),
     return_images: bool = True,
 ):
-    """
-    Segment a breast ultrasound image.
-
-    Returns:
-    - `prediction_mask`: raw 2D mask as nested list
-    - `mask_png_b64`: PNG of the binary mask (base64)
-    - `overlay_png_b64`: PNG of the mask overlaid on the input (base64)
-    """
+    """Segment breast ultrasound image → mask + overlay."""
     try:
         content = await file.read()
         image = Image.open(io.BytesIO(content)).convert("L")
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid image file.")
 
-    img_t = transform(image).unsqueeze(0)  # (1, 1, H, W)
-    pred = get_model().predict(img_t, threshold=THRESHOLD)
-    mask = pred.squeeze().cpu().numpy().astype(np.float32)  # (H, W)
+    # Anonymize + upload to S3
+    request_id = getattr(request.state, "request_id", None)
+    if retention and request_id:
+        from medical_middleware.gdpr.anonymizer import ImageAnonymizer
+
+        anon_bytes = ImageAnonymizer.anonymize_bytes(
+            content, file.content_type or "image/jpeg"
+        )
+        retention.register_upload(request_id, anon_bytes, file.filename or "image.jpg")
+
+    img_t = transform(image).unsqueeze(0)
+    mask = (
+        get_model().predict(img_t, THRESHOLD).squeeze().cpu().numpy().astype(np.float32)
+    )
 
     result = {
-        "prediction_mask": mask.tolist(),
         "device_used": DEVICE,
         "threshold": THRESHOLD,
-        "img_size": IMG_SIZE,
+        "request_id": request_id,
+        "coverage_pct": round(float(mask.mean() * 100), 2),
     }
-
     if return_images:
         gray01 = img_t.squeeze().cpu().numpy()
         result["mask_png_b64"] = to_b64_png(mask)
@@ -162,42 +177,77 @@ async def predict(
     return result
 
 
-# ── Gradio UI ─────────────────────────────────────────────────────────────────
-@torch.no_grad()
-def gradio_predict(image: Image.Image):
-    if image is None:
-        return None, None
+@app.post("/explain/predict")
+async def explain_predict(request: Request, file: UploadFile = File(...)):
+    """Segment + Grad-CAM explanation → mask + heatmap overlay."""
+    try:
+        content = await file.read()
+        image = Image.open(io.BytesIO(content)).convert("L")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid image file.")
 
-    image = image.convert("L")
     img_t = transform(image).unsqueeze(0)
-    pred = get_model().predict(img_t, threshold=THRESHOLD)
-    mask = pred.squeeze().cpu().numpy().astype(np.float32)
+    model = get_model()
     gray01 = img_t.squeeze().cpu().numpy()
+    mask = model.predict(img_t, THRESHOLD).squeeze().cpu().numpy().astype(np.float32)
+    request_id = getattr(request.state, "request_id", None)
 
-    mask_display = cv2.resize(
-        (mask * 255).astype(np.uint8), (256, 256), interpolation=cv2.INTER_NEAREST
-    )
-    overlay_np = make_overlay(gray01, mask)
-    overlay_display = cv2.resize(
-        (overlay_np * 255).astype(np.uint8), (256, 256), interpolation=cv2.INTER_LINEAR
-    )
-    return mask_display, overlay_display
+    xai_result = {}
+    try:
+        from medical_middleware.xai import GradCAM
+
+        target_layer = None
+        for name in ["encoder4", "encoder3", "down4", "down3"]:
+            if hasattr(model.model, name):
+                target_layer = getattr(model.model, name)
+                break
+        if target_layer is None:
+            layers = list(model.model.children())
+            target_layer = layers[len(layers) // 2]
+
+        cam = GradCAM(model.model, target_layer)
+        result = cam.explain(img_t, original_image=image, return_base64=True, alpha=0.5)
+        cam.remove_hooks()
+
+        xai_result = {
+            "heatmap_b64": result["heatmap_b64"],
+            "method": "gradcam",
+            "clinical_note": "Red regions indicate areas that most strongly influenced the segmentation decision.",
+        }
+
+        # Upload heatmap to S3
+        if s3.available and request_id:
+            img_bytes = base64.b64decode(result["heatmap_b64"])
+            s3.upload_bytes(
+                img_bytes,
+                key=f"{middleware_cfg.app_name}/xai/{request_id}_gradcam.png",
+                bucket=s3.bucket_logs,
+                content_type="image/png",
+            )
+
+    except Exception as e:
+        xai_result["error"] = str(e)
+
+    return {
+        "mask_png_b64": to_b64_png(mask),
+        "overlay_png_b64": to_b64_png(make_overlay(gray01, mask)),
+        "coverage_pct": round(float(mask.mean() * 100), 2),
+        "xai": xai_result,
+        "request_id": request_id,
+    }
 
 
-demo = gr.Interface(
-    fn=gradio_predict,
-    inputs=gr.Image(type="pil", label="Upload Breast Ultrasound Image"),
-    outputs=[
-        gr.Image(type="numpy", label="Predicted Segmentation Mask"),
-        gr.Image(type="numpy", label="Overlay (red = lesion)"),
-    ],
-    title="🩺 Breast Ultrasound Segmentation",
-    description=(
-        "Upload a breast ultrasound image to get an AI-generated segmentation mask. "
-        "Trained on the BUSI dataset using a custom U-Net architecture."
-    ),
-    examples=[],
-    allow_flagging="never",
-)
+@app.get("/explain/methods")
+def explain_methods():
+    return {
+        "model_type": "unet",
+        "method": "Grad-CAM",
+        "description": "Highlights which image regions drove the U-Net segmentation decision.",
+        "reference": "Selvaraju et al. (2017) https://arxiv.org/abs/1610.02391",
+    }
 
-gr.mount_gradio_app(app, demo, path="/gradio")
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=8000)
