@@ -90,13 +90,15 @@ def _run_explain(image: Image.Image):
         overlay = _make_overlay(gray01, mask)
 
         target_layer = None
-        for name in ["encoder4", "encoder3", "down4", "down3"]:
-            if hasattr(model, name):
-                target_layer = getattr(model, name)
+        for name in ["encoders.3", "encoders.2", "bottleneck"]:
+            parent_name, _, idx_str = name.partition(".")
+            if hasattr(model, parent_name):
+                parent = getattr(model, parent_name)
+                if idx_str:
+                    target_layer = parent[int(idx_str)]
+                else:
+                    target_layer = parent
                 break
-        if target_layer is None:
-            layers = list(model.children())
-            target_layer = layers[len(layers) // 2]
 
         cam = GradCAM(model, target_layer)
         cam_result = cam.explain(
@@ -223,7 +225,11 @@ with gr.Blocks(title="🩺 Breast Cancer Segmentation", theme=gr.themes.Soft()) 
             | Predictions | **Not stored** | Returned in response only |
 
             #### Right to Erasure (Article 17)
-            Enter your **Request ID** (returned in each API response) to permanently delete all associated data.
+            When using the **API directly** (`/predict`), each response includes a `request_id`.
+            Enter it below to permanently delete all associated data.
+
+            > **Demo note:** This Gradio interface runs inference locally without storing data.
+            > Erasure is only applicable when using the REST API endpoints.
             """
             )
             with gr.Row():

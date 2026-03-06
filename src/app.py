@@ -203,13 +203,17 @@ async def explain_predict(request: Request, file: UploadFile = File(...)):
         from medical_middleware.xai import GradCAM
 
         target_layer = None
-        for name in ["encoder4", "encoder3", "down4", "down3"]:
-            if hasattr(model.model, name):
-                target_layer = getattr(model.model, name)
-                break
-        if target_layer is None:
-            layers = list(model.model.children())
-            target_layer = layers[len(layers) // 2]
+        for name in ["encoders.3", "encoders.2", "bottleneck"]:
+            if hasattr(model.model, name.split(".")[0]):
+                parent = getattr(model.model, name.split(".")[0])
+                if "." in name:
+                    idx = int(name.split(".")[1])
+                    if idx < len(parent):
+                        target_layer = parent[idx]
+                        break
+                else:
+                    target_layer = parent
+                    break
 
         cam = GradCAM(model.model, target_layer)
         result = cam.explain(img_t, original_image=image, return_base64=True, alpha=0.5)
