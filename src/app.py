@@ -79,10 +79,10 @@ class ModelWrapper:
             state = ckpt.get("model_state", ckpt)
             state = {k.replace("module.", "", 1): v for k, v in state.items()}
             self.model.load_state_dict(state, strict=False)
-            print(f"[model] Loaded checkpoint: {checkpoint_path}")
+            print("[model] Loaded checkpoint: {checkpoint_path}")
         else:
             print(
-                f"[model] No checkpoint found — running with random weights (demo mode)"
+                "[model] No checkpoint found — running with random weights (demo mode)"
             )
         self.model.eval()
 
